@@ -21,6 +21,24 @@ without these options will be part of the same program.
 We use the same flags as absl, plus turn some warnings into errors.
 """
 
+def create_llvm_config():
+  if hasattr(cc_common, "do_not_use_tools_cpp_compiler_present"):
+    print('branch 1 taken')
+    native.config_setting(
+      name = "llvm_compiler",
+      flag_values = {
+          "@bazel_tools//tools/cpp:compiler": "llvm",
+      },
+      visibility = [":__subpackages__"],
+    )
+  else:
+    print('branch 2 taken')
+    native.config_setting(
+        name = "llvm_compiler",
+        values = {"compiler": "llvm"},
+        visibility = [":__subpackages__"],
+    )
+
 load(
     "@com_google_absl//absl:copts.bzl",
     "GCC_FLAGS",
@@ -34,9 +52,9 @@ load(
 WERROR = ["-Werror=return-type", "-Werror=switch"]
 
 DEFAULT_COPTS = select({
-    "//opencensus:llvm_compiler": LLVM_FLAGS + WERROR,
+    "//opencensus:llvm_compiler": LLVM_FLAGS + WERROR + ["-Wcompiler-is-clang"],
     "//opencensus:windows": MSVC_FLAGS,
-    "//conditions:default": GCC_FLAGS + WERROR,
+    "//conditions:default": GCC_FLAGS + WERROR + ["-Wcompiler-is-gcc"],
 })
 
 TEST_COPTS = DEFAULT_COPTS + select({

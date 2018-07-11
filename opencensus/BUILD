@@ -14,16 +14,9 @@
 
 licenses(["notice"])  # Apache 2.0
 
-config_setting(
-    name = "llvm_compiler",
-    values = {
-        "compiler": "llvm",
-    },
-    visibility = [
-        ":__subpackages__",
-        "//examples:__subpackages__",
-    ],
-)
+load(":copts.bzl", "create_llvm_config")
+
+create_llvm_config()
 
 config_setting(
     name = "windows",
