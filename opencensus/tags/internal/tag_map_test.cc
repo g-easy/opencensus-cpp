@@ -92,6 +92,26 @@ TEST(TagMapTest, UnorderedMap) {
   EXPECT_EQ(1, map.erase(ts));
 }
 
+TEST(TagMapTest, AddTags) {
+  TagKey k1 = TagKey::Register("z1");
+  TagKey k2 = TagKey::Register("z2");
+  TagKey k3 = TagKey::Register("z3");
+  TagKey k4 = TagKey::Register("z4");
+  TagMap m = {};
+
+  m = m.AddTags({{k2, "a2"}});
+  EXPECT_EQ(m, TagMap({{k2, "a2"}}));
+
+  m = m.AddTags({{k1, "a1"}});
+  EXPECT_EQ(m, TagMap({{k1, "a1"}, {k2, "a2"}}));
+
+  m = m.AddTags({{k3, "a3"}});
+  EXPECT_EQ(m, TagMap({{k1, "a1"}, {k2, "a2"}, {k3, "a3"}}));
+
+  m = m.AddTags({{k2, "b2"}, {k4, "b4"}});
+  EXPECT_EQ(m, TagMap({{k1, "a1"}, {k2, "b2"}, {k3, "a3"}, {k4, "b4"}}));
+}
+
 TEST(TagMapTest, DebugStringContainsTags) {
   TagKey k1 = TagKey::Register("key1");
   TagKey k2 = TagKey::Register("key2");

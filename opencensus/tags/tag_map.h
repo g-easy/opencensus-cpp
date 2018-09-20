@@ -53,6 +53,11 @@ class TagMap final {
   bool operator==(const TagMap& other) const;
   bool operator!=(const TagMap& other) const { return !(*this == other); }
 
+  // Returns a new TagMap, with the given tags added. If a TagKey already exists
+  // in the current map, its value is replaced.
+  TagMap AddTags(std::initializer_list<std::pair<TagKey, absl::string_view>>
+                     new_tags) const;
+
   // Returns a human-readable string for debugging. Do not rely on its format or
   // try to parse it. Do not use it to retrieve tags.
   std::string DebugString() const;

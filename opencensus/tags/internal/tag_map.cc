@@ -14,6 +14,7 @@
 
 #include "opencensus/tags/tag_map.h"
 
+#include <algorithm>
 #include <functional>
 #include <initializer_list>
 #include <string>
@@ -61,6 +62,29 @@ std::size_t TagMap::Hash::operator()(const TagMap& tags) const {
 
 bool TagMap::operator==(const TagMap& other) const {
   return tags_ == other.tags_;
+}
+
+TagMap TagMap::AddTags(
+    std::initializer_list<std::pair<TagKey, absl::string_view>> new_tags)
+    const {
+  std::vector<std::pair<TagKey, std::string>> joined;
+  joined.reserve(tags_.size() + new_tags.size());
+  for (const auto& tag : tags_) {
+    joined.emplace_back(tag.first, tag.second);
+  }
+  auto end = joined.end();
+  for (const auto& tag : new_tags) {
+    auto it = std::lower_bound(joined.begin(), end, tag.first,
+                               [](const std::pair<TagKey, absl::string_view>& a,
+                                  const TagKey& b) { return a.first < b; });
+    if (it != joined.end() && it->first == tag.first) {
+      // Replace existing tag.
+      it->second = std::string(tag.second);
+    } else {
+      joined.emplace_back(tag.first, std::string(tag.second));
+    }
+  }
+  return TagMap(std::move(joined));
 }
 
 std::string TagMap::DebugString() const {
