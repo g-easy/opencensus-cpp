@@ -22,7 +22,7 @@ FOR /F usebackq %%T IN (`bazel query "kind(rule, //...)" ^| FINDSTR /C:"\:_" /V`
 )
 
 REM TODO: enable the full build when errors are resolved.
-bazel build //opencensus/trace //opencensus/stats
+bazel build //opencensus/...
 REM bazel build %BUILDABLES%
 
 IF %ERRORLEVEL% NEQ 0 EXIT /b %ERRORLEVEL%
