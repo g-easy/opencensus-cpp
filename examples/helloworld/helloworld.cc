@@ -21,11 +21,13 @@
 #include "absl/strings/string_view.h"
 #include "absl/time/clock.h"
 #include "absl/time/time.h"
+#include "opencensus/exporters/stats/prometheus/prometheus_exporter.h"
 #include "opencensus/exporters/stats/stdout/stdout_exporter.h"
 #include "opencensus/exporters/trace/stdout/stdout_exporter.h"
 #include "opencensus/stats/stats.h"
 #include "opencensus/trace/sampler.h"
 #include "opencensus/trace/span.h"
+#include "prometheus/exposer.h"
 
 namespace {
 
@@ -59,6 +61,14 @@ int main(int argc, char **argv) {
     return 1;
   }
   srand(time(NULL));
+
+  // Keep a shared pointer to the Prometheus exporter.
+  auto exporter =
+      std::make_shared<opencensus::exporters::stats::PrometheusExporter>();
+
+  // Expose a Prometheus endpoint.
+  prometheus::Exposer exposer("127.0.0.1:8080");
+  exposer.RegisterCollectable(exporter);
 
   // Register stdout exporters.
   opencensus::exporters::stats::StdoutExporter::Register();
