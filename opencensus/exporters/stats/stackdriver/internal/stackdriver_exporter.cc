@@ -22,6 +22,7 @@
 
 #include <grpcpp/grpcpp.h>
 #include "absl/memory/memory.h"
+#include "absl/base/attributes.h"
 #include "absl/strings/str_cat.h"
 #include "absl/strings/string_view.h"
 #include "absl/synchronization/mutex.h"
@@ -46,31 +47,6 @@ constexpr char kProjectIdPrefix[] = "projects/";
 constexpr int kTimeSeriesBatchSize = 200;
 constexpr char kDefaultMetricNamePrefix[] = "custom.googleapis.com/opencensus/";
 
-class Handler : public ::opencensus::stats::StatsExporter::Handler {
- public:
-  explicit Handler(StackdriverOptions&& opts);
-
-  void ExportViewData(
-      const std::vector<std::pair<opencensus::stats::ViewDescriptor,
-                                  opencensus::stats::ViewData>>& data)
-      ABSL_LOCKS_EXCLUDED(mu_) override;
-
- private:
-  // Registers 'descriptor' with Stackdriver if no view by that name has been
-  // registered by this, and adds it to registered_descriptors_ if successful.
-  // Returns true if the view has already been registered or registration is
-  // successful, and false if the registration fails or the name has already
-  // been registered with different parameters.
-  bool MaybeRegisterView(const opencensus::stats::ViewDescriptor& descriptor,
-                         bool add_task_label)
-      ABSL_EXCLUSIVE_LOCKS_REQUIRED(mu_);
-
-  const StackdriverOptions opts_;
-  mutable absl::Mutex mu_;
-  std::unordered_map<std::string, opencensus::stats::ViewDescriptor>
-      registered_descriptors_ ABSL_GUARDED_BY(mu_);
-};
-
 StackdriverOptions SetOptionDefaults(StackdriverOptions&& o) {
   StackdriverOptions opts(std::move(o));
 
@@ -94,10 +70,16 @@ StackdriverOptions SetOptionDefaults(StackdriverOptions&& o) {
   return opts;
 }
 
-Handler::Handler(StackdriverOptions&& opts)
+}  // namespace
+
+StackdriverExporterHandler::StackdriverExporterHandler(
+    StackdriverOptions&& opts)
     : opts_(SetOptionDefaults(std::move(opts))) {}
 
-void Handler::ExportViewData(
+void StackdriverExporterHandler::PrepareClientContext(
+    grpc::ClientContext* context ABSL_ATTRIBUTE_UNUSED) {}
+
+void StackdriverExporterHandler::ExportViewData(
     const std::vector<std::pair<opencensus::stats::ViewDescriptor,
                                 opencensus::stats::ViewData>>& data) {
   // TODO: refactor to avoid copying the timeseries.
@@ -156,6 +138,8 @@ void Handler::ExportViewData(
     }
     ctx[rpc_index].set_deadline(
         absl::ToChronoTime(absl::Now() + opts_.rpc_deadline));
+    PrepareClientContext(&ctx[rpc_index]);
+
     auto rpc(opts_.metric_service_stub->AsyncCreateTimeSeries(&ctx[rpc_index],
                                                               request, &cq));
     rpc->Finish(&response, &status[rpc_index], (void*)(uintptr_t)rpc_index);
@@ -178,7 +162,7 @@ void Handler::ExportViewData(
   }
 }
 
-bool Handler::MaybeRegisterView(
+bool StackdriverExporterHandler::MaybeRegisterView(
     const opencensus::stats::ViewDescriptor& descriptor, bool add_task_label) {
   const auto& it = registered_descriptors_.find(descriptor.name());
   if (it != registered_descriptors_.end()) {
@@ -210,12 +194,10 @@ bool Handler::MaybeRegisterView(
   return true;
 }
 
-}  // namespace
-
 // static
 void StackdriverExporter::Register(StackdriverOptions&& opts) {
   opencensus::stats::StatsExporter::RegisterPushHandler(
-      absl::WrapUnique(new Handler(std::move(opts))));
+      absl::WrapUnique(new StackdriverExporterHandler(std::move(opts))));
 }
 
 // static, DEPRECATED
@@ -231,7 +213,7 @@ void StackdriverExporter::Register(StackdriverOptions& opts) {
   copied_opts.metric_name_prefix = opts.metric_name_prefix;
   copied_opts.metric_service_stub = std::move(opts.metric_service_stub);
   opencensus::stats::StatsExporter::RegisterPushHandler(
-      absl::WrapUnique(new Handler(std::move(opts))));
+      absl::WrapUnique(new StackdriverExporterHandler(std::move(opts))));
 }
 
 // static, DEPRECATED

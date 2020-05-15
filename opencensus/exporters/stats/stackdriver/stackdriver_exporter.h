@@ -24,6 +24,7 @@
 #include "absl/time/time.h"
 #include "google/api/monitored_resource.pb.h"
 #include "google/monitoring/v3/metric_service.grpc.pb.h"
+#include "opencensus/stats/stats.h"
 
 namespace opencensus {
 namespace exporters {
@@ -105,6 +106,37 @@ class StackdriverExporter {
 
  private:
   StackdriverExporter() = delete;
+};
+
+class StackdriverExporterHandler :
+    public ::opencensus::stats::StatsExporter::Handler {
+ public:
+  explicit StackdriverExporterHandler(StackdriverOptions&& opts);
+
+  void ExportViewData(
+      const std::vector<std::pair<opencensus::stats::ViewDescriptor,
+                                  opencensus::stats::ViewData>>& data)
+      ABSL_LOCKS_EXCLUDED(mu_) override;
+
+ protected:
+  // Allows subclasses to provide custom logic to set the ClientContext
+  // such as setting grpc::CallCredentials.
+  virtual void PrepareClientContext(grpc::ClientContext* context);
+
+ private:
+  // Registers 'descriptor' with Stackdriver if no view by that name has been
+  // registered by this, and adds it to registered_descriptors_ if successful.
+  // Returns true if the view has already been registered or registration is
+  // successful, and false if the registration fails or the name has already
+  // been registered with different parameters.
+  bool MaybeRegisterView(const opencensus::stats::ViewDescriptor& descriptor,
+                         bool add_task_label)
+      ABSL_EXCLUSIVE_LOCKS_REQUIRED(mu_);
+
+  const StackdriverOptions opts_;
+  mutable absl::Mutex mu_;
+  std::unordered_map<std::string, opencensus::stats::ViewDescriptor>
+      registered_descriptors_ ABSL_GUARDED_BY(mu_);
 };
 
 }  // namespace stats
